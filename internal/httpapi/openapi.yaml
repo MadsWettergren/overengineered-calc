@@ -1,0 +1,124 @@
+openapi: 3.0.3
+info:
+  title: Over-engineered Calculator API
+  description: >
+    A small REST API for performing basic arithmetic and retrieving
+    calculation history.
+  version: "1.0.0"
+servers:
+  - url: http://localhost:8080
+paths:
+  /v1/calculations:
+    post:
+      summary: Perform a calculation and store it in history
+      operationId: createCalculation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CalculateRequest"
+            examples:
+              multiply:
+                value:
+                  operation: multiply
+                  left: 6
+                  right: 7
+      responses:
+        "201":
+          description: Calculation performed and stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Calculation"
+        "400":
+          description: Malformed JSON, unknown fields, or unsupported operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Well-formed request that is not a valid calculation (e.g. division by zero)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "405":
+          description: HTTP method not allowed on this path
+    get:
+      summary: List calculation history
+      operationId: listCalculations
+      responses:
+        "200":
+          description: All stored calculations, oldest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Calculation"
+        "405":
+          description: HTTP method not allowed on this path
+  /health/live:
+    get:
+      summary: Liveness probe
+      operationId: healthLive
+      responses:
+        "200":
+          description: The process is running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+components:
+  schemas:
+    CalculateRequest:
+      type: object
+      required: [operation, left, right]
+      additionalProperties: false
+      properties:
+        operation:
+          type: string
+          enum: [add, subtract, multiply, divide]
+        left:
+          type: number
+          format: double
+        right:
+          type: number
+          format: double
+    Calculation:
+      type: object
+      properties:
+        id:
+          type: string
+        operation:
+          type: string
+          enum: [add, subtract, multiply, divide]
+        left:
+          type: number
+          format: double
+        right:
+          type: number
+          format: double
+        result:
+          type: number
+          format: double
+        created_at:
+          type: string
+          format: date-time
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: division_by_zero
+            message:
+              type: string
+              example: cannot divide by zero
