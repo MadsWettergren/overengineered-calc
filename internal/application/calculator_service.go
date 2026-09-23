@@ -44,19 +44,12 @@ func (s *CalculatorService) Calculate(input calculator.Input) (history.Calculati
 		Result:    result,
 	}
 
-	if err := s.repository.Add(record); err != nil {
+	storedRecord, err := s.repository.Add(record)
+	if err != nil {
 		return history.Calculation{}, err
 	}
 
-	// The in-memory repository assigns the ID and timestamp when Add is
-	// called. We retrieve the list and return the newest record.
-	//
-	// This is acceptable for our first in-memory implementation. When we
-	// add a database repository, we will improve the Repository interface
-	// so Add returns the stored record directly.
-	records := s.repository.List()
-
-	return records[len(records)-1], nil
+	return storedRecord, nil
 }
 
 // History returns all stored calculations.

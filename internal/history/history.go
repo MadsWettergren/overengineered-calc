@@ -34,7 +34,13 @@ type Calculation struct {
 // implementation. That makes the application easy to test and allows us to
 // replace this in-memory implementation with PostgreSQL later.
 type Repository interface {
-	Add(calculation Calculation) error
+	// Add stores a calculation and returns the stored version.
+	//
+	// The returned value may contain fields assigned by the repository,
+	// such as an ID and creation timestamp.
+	Add(calculation Calculation) (Calculation, error)
+
+	// List returns all stored calculations.
 	List() []Calculation
 }
 
@@ -63,7 +69,7 @@ func NewMemoryRepository() *MemoryRepository {
 //
 // We use a mutex because HTTP requests may be handled concurrently. Without
 // synchronization, two requests could modify the slice at the same time.
-func (r *MemoryRepository) Add(calculation Calculation) error {
+func (r *MemoryRepository) Add(calculation Calculation) (Calculation, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -79,7 +85,8 @@ func (r *MemoryRepository) Add(calculation Calculation) error {
 
 	r.calculations = append(r.calculations, calculation)
 
-	return nil
+	// Return the exact record that was stored, including generated fields.
+	return calculation, nil
 }
 
 // List returns all stored calculations.

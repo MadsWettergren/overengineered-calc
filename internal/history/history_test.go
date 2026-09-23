@@ -15,8 +15,17 @@ func TestMemoryRepositoryStoresCalculations(t *testing.T) {
 		Result:    5,
 	}
 
-	if err := repository.Add(calculation); err != nil {
+	storedCalculation, err := repository.Add(calculation)
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if storedCalculation.ID == "" {
+		t.Error("expected returned calculation to have an ID")
+	}
+
+	if storedCalculation.CreatedAt.IsZero() {
+		t.Error("expected returned calculation to have a creation time")
 	}
 
 	calculations := repository.List()
@@ -49,7 +58,7 @@ func TestMemoryRepositoryReturnsACopy(t *testing.T) {
 
 	originalTime := time.Now().UTC()
 
-	if err := repository.Add(Calculation{
+	if _, err := repository.Add(Calculation{
 		Operation: "multiply",
 		Left:      4,
 		Right:     5,
