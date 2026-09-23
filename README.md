@@ -1,0 +1,210 @@
+# Over-engineered Calculator
+
+A small, production-shaped REST API for performing basic arithmetic and
+keeping a history of past calculations, written in Go.
+
+The name is the assignment's joke, not mine: the calculator itself is
+trivial. What this project actually demonstrates is the structure,
+testing, and tooling around it — the kind of decisions that matter once a
+service has to keep running for years, not just work once in a demo.
+
+## Go experience note
+
+<!-- Replace this with an honest note about your Go background, e.g.:
+"I've used Go for X months/years on Y projects" or
+"This is my first significant Go project; I have production experience in
+[other language] and leaned on that for the overall design." -->
+
+## Architecture
+
+```text
+HTTP request
+    │
+    ▼
+internal/httpapi      (routing, JSON decoding/encoding, status codes)
+    │
+    ▼
+internal/application   (use-case orchestration)
+    │
+    ▼
+internal/calculator    (arithmetic rules — no HTTP, no storage)
+    │
+    ▼
+internal/history       (storage interface + in-memory implementation)
+```
+
+Each layer only knows about the layer directly below it, and only through
+an interface where one is needed:
+
+| Package | Responsibility | Knows about HTTP? | Knows about storage? |
+|---|---|---|---|
+| `internal/calculator` | Arithmetic rules | No | No |
+| `internal/history` | Calculation records and storage | No | — |
+| `internal/application` | Coordinates calculator + history | No | Only via `history.Repository` |
+| `internal/httpapi` | Decoding, routing, status codes | Yes | No |
+| `cmd/api` | Wires everything together | Yes (constructs the server) | Yes (constructs the repository) |
+
+This separation is what makes `internal/calculator` and
+`internal/application` testable with plain unit tests, with no HTTP server
+or database involved — and what would let a PostgreSQL-backed
+`history.Repository` replace the in-memory one later without touching the
+calculator or the HTTP layer at all.
+
+History is currently stored in memory and is lost when the process
+restarts. That's a deliberate scope decision, not an oversight — see
+[Design decisions](#design-decisions).
+
+## Running it
+
+### With Docker Compose (recommended)
+
+```bash
+docker compose up --build
+```
+
+The API is now listening on `http://localhost:8080`.
+
+Stop it with `Ctrl+C`, or from another terminal:
+
+```bash
+docker compose down
+```
+
+### With Go directly
+
+Requires Go 1.27 or later.
+
+```bash
+go run ./cmd/api
+```
+
+## Using the API
+
+### Perform a calculation
+
+```bash
+curl -X POST http://localhost:8080/v1/calculations \
+  -H 'Content-Type: application/json' \
+  -d '{"operation":"multiply","left":6,"right":7}'
+```
+
+```json
+{
+  "id": "b3f1...",
+  "operation": "multiply",
+  "left": 6,
+  "right": 7,
+  "result": 42,
+  "created_at": "2026-09-23T10:55:06Z"
+}
+```
+
+Supported operations: `add`, `subtract`, `multiply`, `divide`.
+
+### List calculation history
+
+```bash
+curl http://localhost:8080/v1/calculations
+```
+
+### Check liveness
+
+```bash
+curl http://localhost:8080/health/live
+```
+
+### API documentation
+
+The full OpenAPI 3.0 specification is served by the running service itself:
+
+```bash
+curl http://localhost:8080/openapi.yaml
+```
+
+Paste that output into [editor.swagger.io](https://editor.swagger.io) for
+an interactive view you can send requests from directly, without installing
+anything locally.
+
+### Error format
+
+Errors share one shape across the API:
+
+```json
+{
+  "error": {
+    "code": "division_by_zero",
+    "message": "cannot divide by zero"
+  }
+}
+```
+
+| Status | Meaning |
+|---|---|
+| `400` | Malformed JSON, unknown fields, or an unsupported operation |
+| `422` | Well-formed request that isn't a valid calculation (e.g. division by zero) |
+| `404` | Unknown path |
+| `405` | HTTP method not supported on that path |
+
+## Testing
+
+```bash
+go test -race ./...
+```
+
+With coverage:
+
+```bash
+go test ./... -cover
+```
+
+Tests are colocated with the code they cover (`*_test.go` next to the
+package it tests), which is Go convention. `internal/calculator` and
+`internal/history` are tested in isolation with no HTTP server involved;
+`internal/httpapi` is tested by driving the `Handler` directly through
+`net/http/httptest`, which is fast and needs no real network socket.
+
+## Design decisions
+
+**In-memory storage instead of PostgreSQL.** The assignment lists
+persistence-grade storage as a nice-to-have, not a must-have. The
+`history.Repository` interface is the seam a PostgreSQL implementation
+would plug into — `internal/application` and `internal/httpapi` depend
+only on that interface, so adding a database-backed repository later
+would not require changing either of them.
+
+**Structured requests instead of a free-text expression parser.**
+`{"operation": "add", "left": 2, "right": 3}` avoids the ambiguity of
+parsing arbitrary strings like `"2 + 3 * 4"` — operator precedence,
+parentheses, and malformed input all become non-issues. It's a
+deliberately narrower scope than a "real" calculator, in exchange for a
+smaller and more predictable surface area.
+
+**`float64` instead of a decimal type.** For addition, subtraction,
+multiplication, and division of arbitrary numbers, some floating-point
+imprecision (e.g. `0.1 + 0.2`) is an accepted trade-off here in exchange
+for not adding an external decimal library. A production system handling
+money would make the opposite trade-off.
+
+**No web framework.** The API surface is three routes. Go's standard
+`net/http` handles that without needing to evaluate, pin, and maintain a
+router dependency.
+
+**A single container, not microservices.** The domain is small enough
+that splitting it into separate services would add network calls,
+deployment complexity, and failure modes without adding real isolation
+benefits. The "best-effort microservice architecture" nice-to-have is
+addressed instead by keeping the *internal* boundaries clean — the
+layering above is what would let pieces be extracted into separate
+services later, if the domain ever grew enough to justify it.
+
+## Project layout
+
+```text
+cmd/api/                   Application entry point (dependency wiring)
+internal/calculator/       Arithmetic rules
+internal/history/          Calculation records + storage interface
+internal/application/      Use-case orchestration
+internal/httpapi/          HTTP handlers, routing, OpenAPI spec
+Dockerfile                 Multi-stage build (compile, then minimal runtime image)
+docker-compose.yml         Single-command run
+```
