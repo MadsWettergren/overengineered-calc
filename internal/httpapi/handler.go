@@ -28,6 +28,13 @@ import (
 //go:embed openapi.yaml
 var openAPISpecification []byte
 
+// webPage is the small HTML/JS client bundled with the API. Embedding it
+// keeps the binary self-contained, the same reasoning as the OpenAPI spec
+// above.
+//
+//go:embed web/index.html
+var webPage []byte
+
 // Handler contains the dependencies required by the HTTP API.
 type Handler struct {
 	service *application.CalculatorService
@@ -87,6 +94,9 @@ func (h *Handler) ServeHTTP(responseWriter http.ResponseWriter, request *http.Re
 
 	case "/openapi.yaml":
 		h.serveOpenAPISpec(responseWriter, request)
+
+	case "/":
+		h.serveWebPage(responseWriter, request)
 
 	default:
 		http.NotFound(responseWriter, request)
@@ -223,6 +233,22 @@ func (h *Handler) serveOpenAPISpec(
 	responseWriter.Header().Set("Content-Type", "application/yaml")
 	responseWriter.WriteHeader(http.StatusOK)
 	_, _ = responseWriter.Write(openAPISpecification)
+}
+
+// serveWebPage returns the embedded web client.
+func (h *Handler) serveWebPage(
+	responseWriter http.ResponseWriter,
+	request *http.Request,
+) {
+	if request.Method != http.MethodGet {
+		responseWriter.Header().Set("Allow", "GET")
+		http.Error(responseWriter, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	responseWriter.Header().Set("Content-Type", "text/html; charset=utf-8")
+	responseWriter.WriteHeader(http.StatusOK)
+	_, _ = responseWriter.Write(webPage)
 }
 
 // writeJSON serializes a value and writes it as a JSON response.

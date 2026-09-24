@@ -12,6 +12,8 @@ paths:
     post:
       summary: Perform a calculation and store it in history
       operationId: createCalculation
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -37,6 +39,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Missing or invalid bearer token
         "422":
           description: Well-formed request that is not a valid calculation (e.g. division by zero)
           content:
@@ -48,6 +52,8 @@ paths:
     get:
       summary: List calculation history
       operationId: listCalculations
+      security:
+        - bearerAuth: []
       responses:
         "200":
           description: All stored calculations, oldest first
@@ -59,6 +65,58 @@ paths:
                   $ref: "#/components/schemas/Calculation"
         "405":
           description: HTTP method not allowed on this path
+            /v1/auth/register:
+    post:
+      summary: Register a new account
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
+        "400":
+          description: Invalid email, weak password, or malformed JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email is already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/auth/login:
+    post:
+      summary: Log in and receive a bearer token
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Invalid email or password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /health/live:
     get:
       summary: Liveness probe
@@ -75,6 +133,13 @@ paths:
                     type: string
                     example: ok
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: >
+        Obtain a token from POST /v1/auth/login and pass it as
+        `Authorization: Bearer <token>`.
   schemas:
     CalculateRequest:
       type: object
@@ -90,6 +155,39 @@ components:
         right:
           type: number
           format: double
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+    RegisterResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+    LoginRequest:
+      type: object
+      required: [email, password]
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
     Calculation:
       type: object
       properties:

@@ -80,6 +80,39 @@ go run ./cmd/api
 
 ## Using the API
 
+### Authenticate
+
+Register an account:
+
+```bash
+curl -X POST http://localhost:8080/v1/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"ada@example.com","password":"correct horse battery"}'
+```
+
+Log in to get a bearer token:
+
+```bash
+curl -X POST http://localhost:8080/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"ada@example.com","password":"correct horse battery"}'
+```
+
+```json
+{ "token": "3f9a1c..." }
+```
+
+Use the token on every calculator request:
+
+```bash
+curl -X POST http://localhost:8080/v1/calculations \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer 3f9a1c...' \
+  -d '{"operation":"multiply","left":6,"right":7}'
+```
+
+Missing or invalid tokens get a `401`.
+
 ### Perform a calculation
 
 ```bash
@@ -141,6 +174,7 @@ Errors share one shape across the API:
 | Status | Meaning |
 |---|---|
 | `400` | Malformed JSON, unknown fields, or an unsupported operation |
+| `401` | Missing or invalid bearer token |
 | `422` | Well-formed request that isn't a valid calculation (e.g. division by zero) |
 | `404` | Unknown path |
 | `405` | HTTP method not supported on that path |
@@ -196,6 +230,22 @@ benefits. The "best-effort microservice architecture" nice-to-have is
 addressed instead by keeping the *internal* boundaries clean — the
 layering above is what would let pieces be extracted into separate
 services later, if the domain ever grew enough to justify it.
+
+**Opaque in-memory tokens instead of JWTs.** A single-instance service has
+no need for a token format that's independently verifiable without a
+shared store — that's the problem JWTs solve for multi-instance
+deployments. The trade-off: tokens don't survive a restart and never
+expire. A production version would add expiry at minimum, and JWTs (or a
+shared token store) the moment there's more than one instance of this
+service running.
+
+**History is shared across accounts, not scoped per user.** Auth here
+gates *access* to the calculator rather than partitioning data by who's
+using it — every authenticated user sees the same history. Scoping
+history to individual users is a natural next step (it would mean
+associating each `history.Calculation` with a user ID), but it's a change
+to `internal/history` and `internal/application`, not just the HTTP
+layer, so it's being called out here rather than folded in silently.
 
 ## Project layout
 

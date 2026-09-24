@@ -437,3 +437,20 @@ func TestEndToEnd_RegisterLoginCalculate(t *testing.T) {
 			http.StatusCreated, calculateRecorder.Code, calculateRecorder.Body.String())
 	}
 }
+
+func TestServeWebPage(t *testing.T) {
+	handler := newTestHandler()
+
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, recorder.Code)
+	}
+
+	if !bytes.Contains(recorder.Body.Bytes(), []byte("<html")) {
+		t.Errorf("expected response to contain HTML")
+	}
+}

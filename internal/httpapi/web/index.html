@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Over-engineered Calculator</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            max-width: 480px;
+            margin: 3rem auto;
+            padding: 0 1rem;
+            color: #1a1a1a;
+        }
+
+        h1 {
+            font-size: 1.25rem;
+        }
+
+        section {
+            margin-bottom: 2rem;
+        }
+
+        label {
+            display: block;
+            margin-top: 0.75rem;
+            font-size: 0.9rem;
+        }
+
+        input,
+        select,
+        button {
+            font-size: 1rem;
+            padding: 0.4rem;
+            margin-top: 0.25rem;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        button {
+            margin-top: 1rem;
+            cursor: pointer;
+        }
+
+        #calculatorSection {
+            display: none;
+        }
+
+        .error {
+            color: #b00020;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        .result {
+            font-size: 1.1rem;
+            margin-top: 0.75rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 0.3rem;
+            border-bottom: 1px solid #ddd;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Over-engineered Calculator</h1>
+
+    <section id="authSection">
+        <h2>Log in</h2>
+        <label>Email
+            <input type="email" id="loginEmail" autocomplete="username" />
+        </label>
+        <label>Password
+            <input type="password" id="loginPassword" autocomplete="current-password" />
+        </label>
+        <button id="loginButton">Log in</button>
+        <p id="authError" class="error"></p>
+
+        <details style="margin-top: 1.5rem;">
+            <summary>No account yet? Register</summary>
+            <label>Email
+                <input type="email" id="registerEmail" autocomplete="username" />
+            </label>
+            <label>Password
+                <input type="password" id="registerPassword" autocomplete="new-password" />
+            </label>
+            <button id="registerButton">Register</button>
+            <p id="registerError" class="error"></p>
+        </details>
+    </section>
+
+    <section id="calculatorSection">
+        <h2>Calculate</h2>
+        <label>Operation
+            <select id="operation">
+                <option value="add">Add</option>
+                <option value="subtract">Subtract</option>
+                <option value="multiply">Multiply</option>
+                <option value="divide">Divide</option>
+            </select>
+        </label>
+        <label>Left
+            <input type="number" id="left" value="0" />
+        </label>
+        <label>Right
+            <input type="number" id="right" value="0" />
+        </label>
+        <button id="calculateButton">Calculate</button>
+        <p id="calculateError" class="error"></p>
+        <p id="result" class="result"></p>
+
+        <h2>History</h2>
+        <button id="refreshHistoryButton">Refresh</button>
+        <table id="historyTable">
+            <thead>
+                <tr>
+                    <th>Operation</th>
+                    <th>Left</th>
+                    <th>Right</th>
+                    <th>Result</th>
+                </tr>
+            </thead>
+            <tbody id="historyBody"></tbody>
+        </table>
+
+        <button id="logoutButton" style="margin-top: 2rem;">Log out</button>
+    </section>
+
+    <script>
+        // The page is served by the same Go binary as the API, so relative
+        // paths ("/v1/...") resolve to this same origin. No base URL or CORS
+        // configuration is needed.
+        let authToken = null;
+
+        const authSection = document.getElementById("authSection");
+        const calculatorSection = document.getElementById("calculatorSection");
+
+        async function apiFetch(path, options = {}) {
+            const response = await fetch(path, options);
+            const body = await response.json().catch(() => null);
+
+            if (!response.ok) {
+                const message = body && body.error ? body.error.message : "request failed";
+                throw new Error(message);
+            }
+
+            return body;
+        }
+
+        function showCalculator() {
+            authSection.style.display = "none";
+            calculatorSection.style.display = "block";
+            loadHistory();
+        }
+
+        function showAuth() {
+            authToken = null;
+            calculatorSection.style.display = "none";
+            authSection.style.display = "block";
+        }
+
+        document.getElementById("registerButton").addEventListener("click", async () => {
+            const errorEl = document.getElementById("registerError");
+            errorEl.textContent = "";
+
+            try {
+                await apiFetch("/v1/auth/register", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        email: document.getElementById("registerEmail").value,
+                        password: document.getElementById("registerPassword").value,
+                    }),
+                });
+                errorEl.style.color = "#1a1a1a";
+                errorEl.textContent = "Account created. You can log in now.";
+            } catch (err) {
+                errorEl.style.color = "#b00020";
+                errorEl.textContent = err.message;
+            }
+        });
+
+        document.getElementById("loginButton").addEventListener("click", async () => {
+            const errorEl = document.getElementById("authError");
+            errorEl.textContent = "";
+
+            try {
+                const body = await apiFetch("/v1/auth/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        email: document.getElementById("loginEmail").value,
+                        password: document.getElementById("loginPassword").value,
+                    }),
+                });
+                authToken = body.token;
+                showCalculator();
+            } catch (err) {
+                errorEl.textContent = err.message;
+            }
+        });
+
+        document.getElementById("logoutButton").addEventListener("click", showAuth);
+
+        document.getElementById("calculateButton").addEventListener("click", async () => {
+            const errorEl = document.getElementById("calculateError");
+            const resultEl = document.getElementById("result");
+            errorEl.textContent = "";
+            resultEl.textContent = "";
+
+            try {
+                const body = await apiFetch("/v1/calculations", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": "Bearer " + authToken,
+                    },
+                    body: JSON.stringify({
+                        operation: document.getElementById("operation").value,
+                        left: parseFloat(document.getElementById("left").value),
+                        right: parseFloat(document.getElementById("right").value),
+                    }),
+                });
+                resultEl.textContent = "Result: " + body.result;
+                loadHistory();
+            } catch (err) {
+                errorEl.textContent = err.message;
+            }
+        });
+
+        async function loadHistory() {
+            try {
+                const records = await apiFetch("/v1/calculations", {
+                    headers: { "Authorization": "Bearer " + authToken },
+                });
+
+                const body = document.getElementById("historyBody");
+                body.innerHTML = "";
+
+                for (const record of records) {
+                    const row = document.createElement("tr");
+                    row.innerHTML =
+                        "<td>" + record.operation + "</td>" +
+                        "<td>" + record.left + "</td>" +
+                        "<td>" + record.right + "</td>" +
+                        "<td>" + record.result + "</td>";
+                    body.appendChild(row);
+                }
+            } catch (err) {
+                document.getElementById("calculateError").textContent = err.message;
+            }
+        }
+
+        document.getElementById("refreshHistoryButton").addEventListener("click", loadHistory);
+    </script>
+</body>
+
+</html>
