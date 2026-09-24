@@ -1,0 +1,25 @@
+Over-engineered calculator
+
+Must have:
+
+1. Create a basic calculator with history.
+2. There should be a clear separation of logic.
+3. All logic should be covered by unit tests.
+4. The calculator should expose a RESTful interface that we can run ourselves with a single command (a Docker image is fine).
+5. The API should be documented, and it should be easy for us to test.
+6. All source code should be available via your personal Github account, with a README.
+
+Nice to have:
+
+1. Best effort micro-service architecture (given the timeframe).
+2. Auth for using the service (email/password will suffice).
+3. A small webpage utilizing the calculator.
+4. A deploy pipeline and a public deployment.
+
+As the title says, it is an over-engineered calculator: show us the design patterns and best practices you believe belong in a service 
+that has to live for years, while fulfilling the "must have" requirements. Everything in the solution should be yours to explain.
+
+You should use AI tools as you normally would in your work, but remember that you own the code.
+
+The assignment must be written in Go, since that is our tech stack. We understand if you are not that proficient in Go yet. Add a short 
+note about your level of Go experience, and we will take it into consideration.

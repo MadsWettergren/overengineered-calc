@@ -17,6 +17,7 @@ import (
 	"net/http"
 
 	"github.com/MadsWettergren/over-engineered-calculator/internal/application"
+	"github.com/MadsWettergren/over-engineered-calculator/internal/auth"
 	"github.com/MadsWettergren/over-engineered-calculator/internal/calculator"
 )
 
@@ -30,12 +31,15 @@ var openAPISpecification []byte
 // Handler contains the dependencies required by the HTTP API.
 type Handler struct {
 	service *application.CalculatorService
+	auth    *auth.Service
 }
 
-// NewHandler creates an HTTP handler using the provided application service.
-func NewHandler(service *application.CalculatorService) *Handler {
+// NewHandler creates an HTTP handler using the provided application and
+// auth services.
+func NewHandler(service *application.CalculatorService, authService *auth.Service) *Handler {
 	return &Handler{
 		service: service,
+		auth:    authService,
 	}
 }
 
@@ -70,7 +74,13 @@ type errorDetails struct {
 func (h *Handler) ServeHTTP(responseWriter http.ResponseWriter, request *http.Request) {
 	switch request.URL.Path {
 	case "/v1/calculations":
-		h.handleCalculations(responseWriter, request)
+		requireAuth(h.auth, h.handleCalculations)(responseWriter, request)
+
+	case "/v1/auth/register":
+		h.handleRegister(responseWriter, request)
+
+	case "/v1/auth/login":
+		h.handleLogin(responseWriter, request)
 
 	case "/health/live":
 		h.handleHealth(responseWriter, request)

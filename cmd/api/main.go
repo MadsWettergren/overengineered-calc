@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/MadsWettergren/over-engineered-calculator/internal/application"
+	"github.com/MadsWettergren/over-engineered-calculator/internal/auth"
 	"github.com/MadsWettergren/over-engineered-calculator/internal/history"
 	"github.com/MadsWettergren/over-engineered-calculator/internal/httpapi"
 )
@@ -21,8 +22,12 @@ func main() {
 	// Wire the application service to the repository.
 	service := application.NewCalculatorService(repository)
 
-	// Wire the HTTP handler to the application service.
-	handler := httpapi.NewHandler(service)
+	// Wire the auth service to its own, separate in-memory repository.
+	authRepository := auth.NewMemoryRepository()
+	authService := auth.NewService(authRepository)
+
+	// Wire the HTTP handler to both services.
+	handler := httpapi.NewHandler(service, authService)
 
 	server := &http.Server{
 		Addr:    ":8080",
