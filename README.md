@@ -10,10 +10,8 @@ service has to keep running for years, not just work once in a demo.
 
 ## Go experience note
 
-<!-- Replace this with an honest note about your Go background, e.g.:
-"I've used Go for X months/years on Y projects" or
-"This is my first significant Go project; I have production experience in
-[other language] and leaned on that for the overall design." -->
+This is my first significant Go project; I have production experience in
+C# and .NET and leaned on that for the overall design.
 
 ## Architecture
 
@@ -21,8 +19,9 @@ service has to keep running for years, not just work once in a demo.
 HTTP request
     │
     ▼
-internal/httpapi      (routing, JSON decoding/encoding, status codes)
+internal/httpapi      (routing, JSON, status codes, auth middleware)
     │
+    ├──────────────► internal/auth   (accounts, bcrypt, tokens)
     ▼
 internal/application   (use-case orchestration)
     │
@@ -69,6 +68,12 @@ Stop it with `Ctrl+C`, or from another terminal:
 ```bash
 docker compose down
 ```
+### Web client
+
+Open `http://localhost:8080/` in a browser for a small page where you can
+register, log in, run calculations, and view history. It's a single static
+HTML file embedded in the binary and served by the API itself, so there's
+nothing extra to build or run.
 
 ### With Go directly
 
@@ -247,14 +252,22 @@ associating each `history.Calculation` with a user ID), but it's a change
 to `internal/history` and `internal/application`, not just the HTTP
 layer, so it's being called out here rather than folded in silently.
 
+**Scope deliberately left out.** No CI pipeline and no public deployment.
+The service runs identically anywhere Docker does (`docker compose up
+--build`), and the test suite is one command (`go test -race ./...`), so
+both would be straightforward to add. I prioritized the parts that change
+the code and its design (authentication, the web client) over the parts
+that change how it is hosted.
+
 ## Project layout
 
 ```text
 cmd/api/                   Application entry point (dependency wiring)
 internal/calculator/       Arithmetic rules
 internal/history/          Calculation records + storage interface
+internal/auth/             Accounts, password hashing, token handling
 internal/application/      Use-case orchestration
-internal/httpapi/          HTTP handlers, routing, OpenAPI spec
+internal/httpapi/          HTTP handlers, middleware, OpenAPI spec, web client
 Dockerfile                 Multi-stage build (compile, then minimal runtime image)
 docker-compose.yml         Single-command run
 ```
