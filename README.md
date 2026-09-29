@@ -123,6 +123,7 @@ Missing or invalid tokens get a `401`.
 ```bash
 curl -X POST http://localhost:8080/v1/calculations \
   -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer 3f9a1c...' \
   -d '{"operation":"multiply","left":6,"right":7}'
 ```
 
@@ -142,7 +143,8 @@ Supported operations: `add`, `subtract`, `multiply`, `divide`.
 ### List calculation history
 
 ```bash
-curl http://localhost:8080/v1/calculations
+curl http://localhost:8080/v1/calculations \
+  -H 'Authorization: Bearer 3f9a1c...'
 ```
 
 ### Check liveness

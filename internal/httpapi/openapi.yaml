@@ -65,7 +65,7 @@ paths:
                   $ref: "#/components/schemas/Calculation"
         "405":
           description: HTTP method not allowed on this path
-            /v1/auth/register:
+  /v1/auth/register:
     post:
       summary: Register a new account
       operationId: registerUser
